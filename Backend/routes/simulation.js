@@ -390,4 +390,79 @@ router.post('/progress', auth, async (req, res) => {
   }
 });
 
+// ── POST Generate Compliance & Policy Insights ────────────────────────────────
+router.post('/compliance', auth, async (req, res) => {
+  try {
+    const { problemStatement } = req.body;
+    if (!problemStatement?.trim()) return res.status(400).json({ message: 'Problem statement required' });
+
+    const groq = getGroq();
+    const prompt = `You are a legal and government compliance expert specializing in Indian social ventures and startups.
+
+Based on the following founder's problem statement, generate a comprehensive compliance and policy guide.
+
+Problem Statement: "${problemStatement}"
+
+Return ONLY a valid JSON object with exactly this structure (no markdown, no extra text):
+{
+  "overview": "2-3 sentence regulatory landscape summary for this venture type",
+  "schemes": [
+    {
+      "name": "Full official scheme name",
+      "authority": "Ministry or body name",
+      "inrBenefit": "Specific monetary benefit explicitly formatted in INR (e.g. '₹50,00,000 grant' or 'Up to ₹2 Crores tax relief')",
+      "eligibility": "Who qualifies",
+      "howToApply": "Brief application process"
+    }
+  ],
+  "legalRequirements": [
+    {
+      "item": "Requirement name",
+      "description": "What it involves",
+      "priority": "mandatory",
+      "timeline": "When to do this (e.g. Before launch / Within 30 days)"
+    }
+  ],
+  "risks": [
+    {
+      "issue": "Regulatory risk title",
+      "description": "Why this is a risk for this specific venture",
+      "severity": "high",
+      "mitigation": "How to address it"
+    }
+  ]
+}
+
+Rules:
+- Include 3-5 schemes most relevant to the problem domain (healthcare/education/fintech/agriculture/climate/etc.)
+- Include 4-6 legal requirements (registration, GST, FSSAI, data protection, etc. as relevant)
+- Include 3-4 risks with severity: "high", "medium", or "low"
+- priority must be exactly: "mandatory", "recommended", or "optional"
+- Be specific to India and to the problem domain
+- Return ONLY the JSON object`;
+
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.4,
+      max_tokens: 2000
+    });
+
+    const raw = completion.choices[0]?.message?.content || '';
+    const cleaned = stripCodeFences(raw);
+    let result;
+    try {
+      result = JSON.parse(cleaned);
+    } catch {
+      return res.status(500).json({ message: 'Failed to parse compliance data' });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Compliance error:', error);
+    res.status(500).json({ message: 'Error generating compliance insights' });
+  }
+});
+
 export default router;
+

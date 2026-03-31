@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken';
 import User from './models/User.js';
 import simulationRoutes from './routes/simulation.js';
 import cofounderRoutes from './routes/cofounder.js';
+import postRoutes from './routes/posts.js';
 
 dotenv.config();
 
@@ -68,7 +69,7 @@ app.post('/api/signup', async (req, res) => {
     res.status(201).json({ 
       message: 'User registered successfully',
       token,
-      user: { id: newUser._id, name: newUser.name, email: newUser.email }
+      user: { id: newUser._id, name: newUser.name, email: newUser.email, bio: newUser.bio, location: newUser.location, title: newUser.title, skills: newUser.skills, linkedinUrl: newUser.linkedinUrl }
     });
   } catch (error) {
     console.error('Signup error:', error);
@@ -106,7 +107,7 @@ app.post('/api/login', async (req, res) => {
     res.json({
       message: 'Login successful',
       token,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, bio: user.bio, location: user.location, title: user.title, skills: user.skills, linkedinUrl: user.linkedinUrl }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -122,12 +123,18 @@ app.put('/api/auth/profile', async (req, res) => {
     const tokenStr = authHeader.split(' ')[1];
     const decoded = jwt.verify(tokenStr, JWT_SECRET);
 
-    const { name, email } = req.body;
+    const { name, email, bio, location, title, skills, linkedinUrl } = req.body;
     const user = await User.findById(decoded.userId);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (name) user.name = name;
     if (email) user.email = email;
+    if (bio !== undefined) user.bio = bio;
+    if (location !== undefined) user.location = location;
+    if (title !== undefined) user.title = title;
+    if (skills !== undefined) user.skills = skills;
+    if (linkedinUrl !== undefined) user.linkedinUrl = linkedinUrl;
+    
     await user.save();
 
     // Generate new token with updated information
@@ -140,7 +147,7 @@ app.put('/api/auth/profile', async (req, res) => {
     res.json({
       message: 'Profile updated',
       token: newToken,
-      user: { id: user._id, name: user.name, email: user.email }
+      user: { id: user._id, name: user.name, email: user.email, bio: user.bio, location: user.location, title: user.title, skills: user.skills, linkedinUrl: user.linkedinUrl }
     });
   } catch (err) {
     console.error('Profile update error:', err);
@@ -150,6 +157,7 @@ app.put('/api/auth/profile', async (req, res) => {
 
 app.use('/api/simulation', simulationRoutes);
 app.use('/api/cofounder', cofounderRoutes);
+app.use('/api/posts', postRoutes);
 
 app.get("/api/health",(req,res)=>{
   console.log("listening");

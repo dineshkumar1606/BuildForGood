@@ -25,7 +25,12 @@ interface Evaluation { score: number; riskLabel: string; winRate: string; discip
 interface Choice { id: string; label: string; deltas: { cash: number; impact: number; trust: number }; }
 interface Scenario { id: string; title: string; description: string; choices: Choice[]; }
 
-type AppState = 'form' | 'personas' | 'chat' | 'evaluation' | 'operational' | 'cofounder_recruit' | 'mvp_builder' | 'investor_pitch' | 'report';
+type AppState = 'form' | 'personas' | 'chat' | 'evaluation' | 'operational' | 'operational_result' | 'cofounder_recruit' | 'mvp_builder' | 'investor_pitch' | 'compliance' | 'report';
+
+interface ComplianceScheme { name: string; authority: string; inrBenefit: string; eligibility: string; howToApply: string; }
+interface LegalRequirement { item: string; description: string; priority: 'mandatory' | 'recommended' | 'optional'; timeline: string; }
+interface ComplianceRisk { issue: string; description: string; severity: 'high' | 'medium' | 'low'; mitigation: string; }
+interface ComplianceData { overview: string; schemes: ComplianceScheme[]; legalRequirements: LegalRequirement[]; risks: ComplianceRisk[]; }
 
 interface CoFounderProfile {
   _id: string;
@@ -84,11 +89,40 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
   // ── MVP BUILDER STATE ──
   const [mvpFeatures, setMvpFeatures] = useState<MVPFeature[]>([]);
 
+  // ── COMPLIANCE STATE ──
+  const [complianceData, setComplianceData] = useState<ComplianceData | null>(null);
+  const [isLoadingCompliance, setIsLoadingCompliance] = useState(false);
+  const [complianceError, setComplianceError] = useState('');
+
+  // ── SHARE MODAL STATE ──
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareCaption, setShareCaption] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
+  const [posted, setPosted] = useState(false);
+
   const getHeaders = () => ({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${localStorage.getItem('token')}`,
     'ngrok-skip-browser-warning': 'true'
   });
+
+  // ── Publish post to community ──
+  const handlePublishPost = async () => {
+    if (!simulationId) return;
+    setIsPosting(true);
+    try {
+      const res = await fetch(`${API_URL}/api/posts`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ simulationId, caption: shareCaption })
+      });
+      if (res.ok) {
+        setPosted(true);
+        setTimeout(() => setShowShareModal(false), 1800);
+      }
+    } catch { /* ignore */ }
+    finally { setIsPosting(false); }
+  };
 
   // Auto-scroll chat
   useEffect(() => {
@@ -121,7 +155,7 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
             
             // Re-route based on saved progress to resume exactly where the founder left off
             if (data.pitchComplete) {
-              setAppState('report');
+              setAppState('compliance');
               if (data.fundingInvestor) {
                 setFundingDetails({ investorName: data.fundingInvestor, amount: data.fundingAmount, equity: data.fundingEquity });
               }
@@ -352,7 +386,7 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
     }
 
     if (isComplete) {
-      setAppState('cofounder_recruit');
+      setAppState('operational_result');
     } else {
       setCurrentScenarioIdx(prev => prev + 1);
     }
@@ -373,15 +407,16 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
   const renderProgress = () => {
     const steps = [
       { id: 1, label: t('discovery'), state: ['form','personas','chat'].includes(appState) ? 'active' : 'done' },
-      { id: 2, label: t('evaluation'), state: appState === 'evaluation' ? 'active' : ['operational','cofounder_recruit','mvp_builder','investor_pitch','report'].includes(appState) ? 'done' : 'pending' },
-      { id: 3, label: t('operations'), state: appState === 'operational' ? 'active' : ['cofounder_recruit','mvp_builder','investor_pitch','report'].includes(appState) ? 'done' : 'pending' },
-      { id: 4, label: 'Co-Founder', state: appState === 'cofounder_recruit' ? 'active' : ['mvp_builder','investor_pitch','report'].includes(appState) ? 'done' : 'pending' },
-      { id: 5, label: 'MVP', state: appState === 'mvp_builder' ? 'active' : ['investor_pitch','report'].includes(appState) ? 'done' : 'pending' },
-      { id: 6, label: 'Investor', state: appState === 'investor_pitch' ? 'active' : appState === 'report' ? 'done' : 'pending' },
-      { id: 7, label: t('report'), state: appState === 'report' ? 'active' : 'pending' },
+      { id: 2, label: t('evaluation'), state: appState === 'evaluation' ? 'active' : ['operational','operational_result','cofounder_recruit','mvp_builder','investor_pitch','compliance','report'].includes(appState) ? 'done' : 'pending' },
+      { id: 3, label: t('operations'), state: ['operational','operational_result'].includes(appState) ? 'active' : ['cofounder_recruit','mvp_builder','investor_pitch','compliance','report'].includes(appState) ? 'done' : 'pending' },
+      { id: 4, label: 'Co-Founder', state: appState === 'cofounder_recruit' ? 'active' : ['mvp_builder','investor_pitch','compliance','report'].includes(appState) ? 'done' : 'pending' },
+      { id: 5, label: 'MVP', state: appState === 'mvp_builder' ? 'active' : ['investor_pitch','compliance','report'].includes(appState) ? 'done' : 'pending' },
+      { id: 6, label: 'Investor', state: appState === 'investor_pitch' ? 'active' : ['compliance','report'].includes(appState) ? 'done' : 'pending' },
+      { id: 7, label: 'Govt Subsidies & Schemes', state: appState === 'compliance' ? 'active' : appState === 'report' ? 'done' : 'pending' },
+      { id: 8, label: t('report'), state: appState === 'report' ? 'active' : 'pending' },
     ];
     return (
-      <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'2rem', padding:'1rem 1.25rem', background:'var(--bg-base)', borderRadius:'var(--radius-md)', border:'1px solid var(--border-light)' }}>
+      <div className="progress-wrapper" style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'2rem', padding:'1rem 1.25rem', background:'var(--bg-base)', borderRadius:'var(--radius-md)', border:'1px solid var(--border-light)', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {steps.map((s, i) => (
           <div key={s.id} style={{ display:'flex', alignItems:'center', gap:'0.5rem', flex: i < steps.length - 1 ? 1 : 0 }}>
             <div style={{ width:28, height:28, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: s.state==='done' ? 'var(--accent-primary)' : s.state==='active' ? 'var(--accent-primary)' : 'var(--bg-surface-hover)', color: s.state !== 'pending' ? '#fff' : 'var(--text-muted)', fontSize:'0.8rem', fontWeight:700 }}>
@@ -694,18 +729,10 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
   // ─────────────────────────────────────────────────
   if (appState === 'operational' && scenarios.length > 0) {
     const scenario = scenarios[currentScenarioIdx];
-    const isFundingCrisis = resources.cash <= 15;
     return (
       <main style={{ flex:1, width:'100%', display:'flex', flexDirection:'column', animation:'fadeIn 0.3s ease-out' }}>
         {renderProgress()}
         {renderGauges()}
-
-        {isFundingCrisis && (
-          <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:'var(--radius-md)', padding:'0.85rem 1.25rem', marginBottom:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'#ef4444' }}>
-            <AlertTriangle size={18}/>
-            <span>{t('fundingCrisis')}</span>
-          </div>
-        )}
 
         <div style={{ background:'var(--bg-base)', border:'1px solid var(--border-light)', borderRadius:'var(--radius-lg)', padding:'2rem', boxShadow:'var(--shadow-md)' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'1.5rem' }}>
@@ -724,16 +751,46 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-light)'; (e.currentTarget as HTMLElement).style.background = 'var(--bg-surface)'; }}>
                 <div style={{ width:28, height:28, borderRadius:'50%', background:'rgba(37,99,235,0.1)', color:'var(--accent-primary)', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'0.85rem', flexShrink:0 }}>{i+1}</div>
                 <div style={{ flex:1 }}>
-                  <div style={{ fontWeight:600, color:'var(--text-primary)', marginBottom:'0.25rem' }}>{choice.label}</div>
-                  <div style={{ display:'flex', gap:'0.75rem', fontSize:'0.78rem', color:'var(--text-muted)' }}>
-                    <span style={{ color: choice.deltas.cash < 0 ? '#ef4444' : '#10b981' }}>Cash {choice.deltas.cash > 0 ? '+' : ''}{choice.deltas.cash}</span>
-                    <span style={{ color: choice.deltas.impact > 0 ? '#10b981' : '#f59e0b' }}>Impact {choice.deltas.impact > 0 ? '+' : ''}{choice.deltas.impact}</span>
-                    <span style={{ color: choice.deltas.trust > 0 ? '#10b981' : '#ef4444' }}>Trust {choice.deltas.trust > 0 ? '+' : ''}{choice.deltas.trust}</span>
-                  </div>
+                  <div style={{ fontWeight:600, color:'var(--text-primary)' }}>{choice.label}</div>
                 </div>
               </button>
             ))}
           </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ─────────────────────────────────────────────────
+  // RENDER: OPERATIONAL RESULT — Option to Retake
+  // ─────────────────────────────────────────────────
+  if (appState === 'operational_result') {
+    return (
+      <main style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeIn 0.3s ease-out' }}>
+        {renderProgress()}
+        <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', borderRadius: 'var(--radius-lg)', padding: '3rem', textAlign: 'center', boxShadow: 'var(--shadow-md)' }}>
+          <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>{resources.cash <= 15 ? '💥' : '🚀'}</div>
+          <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+            {resources.cash <= 15 ? 'Critical Condition (Low Cash)' : 'Operations Complete'}
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '1.1rem' }}>
+            Final Resources — <strong style={{color: resources.cash <= 15 ? '#ef4444' : '#10b981'}}>Cash: {resources.cash}</strong> | Impact: {resources.impact} | Trust: {resources.trust}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button className="btn-outline" onClick={() => {
+              setResources({ cash: 50, impact: 50, trust: 50 });
+              setCurrentScenarioIdx(0);
+              setDecisionLog([]);
+              if (budget) setRemainingBudget(Number(budget));
+              setAppState('operational');
+            }} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <RefreshCw size={16}/> Retake Operations Round
+            </button>
+            <button className="btn-solid" onClick={() => setAppState('cofounder_recruit')} disabled={resources.cash <= 0} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', opacity: resources.cash <= 0 ? 0.5 : 1 }}>
+              Proceed to Co-founder →
+            </button>
+          </div>
+          {resources.cash <= 0 && <p style={{ color: 'var(--error)', marginTop: '1rem', fontWeight: 600 }}>Your startup ran out of funds. You must retake this round to continue.</p>}
         </div>
       </main>
     );
@@ -991,8 +1048,11 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
         {renderProgress()}
         <div style={{ flex: 1, position: 'relative' }}>
           <InvestorPitch problemStatement={problem} onComplete={async (offer) => { 
-            setFundingDetails(offer); 
-            setAppState('report'); 
+            setFundingDetails(offer);
+            // Move to compliance check before report
+            setAppState('compliance');
+            setIsLoadingCompliance(true);
+            setComplianceError('');
             try {
               await fetch(`${API_URL}/api/simulation/progress`, {
                 method: 'POST',
@@ -1006,8 +1066,163 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
                 })
               });
             } catch (e) { console.error('Failed to save pitch state:', e); }
+            // Fetch compliance data
+            try {
+              const cres = await fetch(`${API_URL}/api/simulation/compliance`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ problemStatement: problem })
+              });
+              if (cres.ok) setComplianceData(await cres.json());
+              else setComplianceError('Failed to load compliance insights.');
+            } catch { setComplianceError('Network error loading compliance data.'); }
+            finally { setIsLoadingCompliance(false); }
           }} />
         </div>
+      </main>
+    );
+  }
+
+  // ─────────────────────────────────────────────────
+  // RENDER: COMPLIANCE — Government Policies & Legal
+  // ─────────────────────────────────────────────────
+  if (appState === 'compliance') {
+    const priorityColor = (p: string) => p === 'mandatory' ? '#ef4444' : p === 'recommended' ? '#f59e0b' : '#10b981';
+    const severityColor = (s: string) => s === 'high' ? '#ef4444' : s === 'medium' ? '#f59e0b' : '#10b981';
+    const severityBg   = (s: string) => s === 'high' ? 'rgba(239,68,68,0.08)' : s === 'medium' ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)';
+
+    return (
+      <main style={{ flex:1, width:'100%', display:'flex', flexDirection:'column', animation:'fadeIn 0.4s ease-out', paddingBottom:'3rem' }}>
+        {renderProgress()}
+
+        {/* ── HEADER ── */}
+        <div style={{ textAlign:'center', marginBottom:'2.5rem' }}>
+          <div style={{ fontSize:'3rem', marginBottom:'0.75rem' }}>🏛️</div>
+          <h2 style={{ fontSize:'1.8rem', fontWeight:800, color:'var(--text-primary)', marginBottom:'0.5rem' }}>Government Subsidies & Schemes</h2>
+          <p style={{ color:'var(--text-secondary)', maxWidth:560, margin:'0 auto', lineHeight:1.6, fontSize:'0.95rem' }}>
+            Before your final report, review the government schemes, legal requirements, and regulatory risks specific to your venture.
+          </p>
+        </div>
+
+        {/* ── LOADING ── */}
+        {isLoadingCompliance && (
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'4rem 0', gap:'1.25rem' }}>
+            <div className="loader-white" style={{ width:36, height:36, borderColor:'var(--border-light)', borderLeftColor:'var(--accent-primary)', borderWidth:3 }}/>
+            <p style={{ color:'var(--text-secondary)', fontWeight:500 }}>Analysing India-specific policies for your venture…</p>
+          </div>
+        )}
+
+        {/* ── ERROR ── */}
+        {!isLoadingCompliance && complianceError && (
+          <div style={{ maxWidth:640, margin:'0 auto', background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:'var(--radius-lg)', padding:'1.5rem 2rem', textAlign:'center' }}>
+            <p style={{ color:'#ef4444', fontWeight:600, marginBottom:'1rem' }}>{complianceError}</p>
+            <button className="btn-solid" onClick={() => setAppState('report')}>Skip to Report →</button>
+          </div>
+        )}
+
+        {/* ── CONTENT ── */}
+        {!isLoadingCompliance && complianceData && (
+          <div style={{ maxWidth:860, margin:'0 auto', width:'100%', display:'flex', flexDirection:'column', gap:'2rem' }}>
+
+            {/* Overview banner */}
+            <div style={{ background:'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(124,58,237,0.06))', border:'1px solid rgba(37,99,235,0.18)', borderRadius:'var(--radius-lg)', padding:'1.25rem 1.75rem', borderLeft:'4px solid var(--accent-primary)' }}>
+              <div style={{ fontSize:'0.72rem', fontWeight:800, color:'var(--accent-primary)', letterSpacing:'0.1em', marginBottom:'0.5rem' }}>REGULATORY LANDSCAPE</div>
+              <p style={{ color:'var(--text-primary)', lineHeight:1.7, margin:0, fontSize:'0.97rem' }}>{complianceData.overview}</p>
+            </div>
+
+            {/* ── Government Schemes ── */}
+            <div>
+              <h3 style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text-primary)', marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.6rem' }}>
+                🎁 Eligible Government Schemes & Benefits
+              </h3>
+              <div style={{ display:'flex', flexDirection:'column', gap:'0.85rem' }}>
+                {complianceData.schemes.map((s, i) => (
+                  <div key={i} style={{ background:'var(--bg-base)', border:'1px solid var(--border-light)', borderRadius:'var(--radius-lg)', padding:'1.25rem 1.5rem', boxShadow:'var(--shadow-sm)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:'1rem', marginBottom:'0.6rem' }}>
+                      <div>
+                        <div style={{ fontWeight:700, color:'var(--text-primary)', fontSize:'1rem', marginBottom:'0.2rem' }}>{s.name}</div>
+                        <div style={{ fontSize:'0.78rem', color:'var(--accent-primary)', fontWeight:600 }}>{s.authority}</div>
+                      </div>
+                      <span style={{ flexShrink:0, padding:'0.3rem 0.75rem', borderRadius:'var(--radius-pill)', background:'rgba(16,185,129,0.1)', color:'#10b981', fontSize:'0.78rem', fontWeight:700 }}>
+                        {s.inrBenefit}
+                      </span>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.5rem', marginTop:'0.75rem' }}>
+                      <div style={{ background:'var(--bg-surface)', borderRadius:'var(--radius-md)', padding:'0.6rem 0.85rem' }}>
+                        <div style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.25rem', textTransform:'uppercase', letterSpacing:'0.06em' }}>Eligibility</div>
+                        <div style={{ fontSize:'0.85rem', color:'var(--text-secondary)', lineHeight:1.5 }}>{s.eligibility}</div>
+                      </div>
+                      <div style={{ background:'var(--bg-surface)', borderRadius:'var(--radius-md)', padding:'0.6rem 0.85rem' }}>
+                        <div style={{ fontSize:'0.68rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.25rem', textTransform:'uppercase', letterSpacing:'0.06em' }}>How to Apply</div>
+                        <div style={{ fontSize:'0.85rem', color:'var(--text-secondary)', lineHeight:1.5 }}>{s.howToApply}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Legal Requirements ── */}
+            <div>
+              <h3 style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text-primary)', marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.6rem' }}>
+                ⚖️ Legal Requirements & Registrations
+              </h3>
+              <div style={{ display:'flex', flexDirection:'column', gap:'0.65rem' }}>
+                {complianceData.legalRequirements.map((lr, i) => (
+                  <div key={i} style={{ display:'flex', gap:'1rem', alignItems:'flex-start', background:'var(--bg-base)', border:'1px solid var(--border-light)', borderRadius:'var(--radius-md)', padding:'1rem 1.25rem' }}>
+                    <div style={{ flexShrink:0, width:10, height:10, borderRadius:'50%', background:priorityColor(lr.priority), marginTop:5 }}/>
+                    <div style={{ flex:1 }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:'0.65rem', marginBottom:'0.3rem' }}>
+                        <span style={{ fontWeight:700, color:'var(--text-primary)', fontSize:'0.95rem' }}>{lr.item}</span>
+                        <span style={{ fontSize:'0.72rem', fontWeight:700, padding:'0.2rem 0.6rem', borderRadius:'var(--radius-pill)', background:`${priorityColor(lr.priority)}18`, color:priorityColor(lr.priority), textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                          {lr.priority}
+                        </span>
+                      </div>
+                      <p style={{ color:'var(--text-secondary)', fontSize:'0.87rem', lineHeight:1.5, margin:'0 0 0.3rem' }}>{lr.description}</p>
+                      <div style={{ fontSize:'0.78rem', color:'var(--text-muted)', fontWeight:600 }}>⏱ {lr.timeline}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Regulatory Risks ── */}
+            <div>
+              <h3 style={{ fontSize:'1.15rem', fontWeight:800, color:'var(--text-primary)', marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.6rem' }}>
+                🚨 Regulatory Risks to Watch
+              </h3>
+              <div style={{ display:'flex', flexDirection:'column', gap:'0.85rem' }}>
+                {complianceData.risks.map((r, i) => (
+                  <div key={i} style={{ background:severityBg(r.severity), border:`1px solid ${severityColor(r.severity)}30`, borderRadius:'var(--radius-lg)', padding:'1.25rem 1.5rem', borderLeft:`3px solid ${severityColor(r.severity)}` }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.5rem' }}>
+                      <span style={{ fontWeight:700, color:'var(--text-primary)', fontSize:'0.97rem' }}>{r.issue}</span>
+                      <span style={{ fontSize:'0.72rem', fontWeight:700, padding:'0.2rem 0.6rem', borderRadius:'var(--radius-pill)', background:`${severityColor(r.severity)}18`, color:severityColor(r.severity), textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                        {r.severity} risk
+                      </span>
+                    </div>
+                    <p style={{ color:'var(--text-secondary)', fontSize:'0.88rem', lineHeight:1.6, margin:'0 0 0.6rem' }}>{r.description}</p>
+                    <div style={{ display:'flex', alignItems:'flex-start', gap:'0.5rem', background:'rgba(255,255,255,0.04)', borderRadius:'var(--radius-md)', padding:'0.6rem 0.85rem' }}>
+                      <span style={{ color:severityColor(r.severity), fontSize:'0.8rem', fontWeight:700, flexShrink:0 }}>💡 Mitigation:</span>
+                      <span style={{ color:'var(--text-secondary)', fontSize:'0.85rem', lineHeight:1.5 }}>{r.mitigation}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── CTA ── */}
+            <div style={{ display:'flex', gap:'1rem', paddingTop:'0.5rem' }}>
+              <button onClick={() => setAppState('investor_pitch')} className="btn-outline"
+                style={{ padding:'0.75rem 1.25rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem' }}>
+                ← Back to Pitch
+              </button>
+              <button onClick={() => setAppState('report')} className="btn-solid btn-lg"
+                style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:'0.6rem' }}>
+                📊 View Full Report →
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -1017,17 +1232,85 @@ export function FounderFlowContent({ initialSimulationId, onProjectStarted }: Fo
   // ─────────────────────────────────────────────────
   if (appState === 'report') {
     return (
-      <main style={{ flex:1, width:'100%', display:'flex', flexDirection:'column', animation:'slideUp 0.5s ease-out', paddingBottom:'4rem' }}>
+      <main style={{ flex:1, width:'100%', display:'flex', flexDirection:'column', animation:'slideUp 0.5s ease-out', paddingBottom:'4rem', position:'relative' }}>
         {renderProgress()}
+
+        {/* ── SHARE MODAL OVERLAY ── */}
+        {showShareModal && (
+          <div style={{
+            position:'fixed', inset:0, zIndex:999,
+            background:'rgba(0,0,0,0.65)', backdropFilter:'blur(6px)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            padding:'1.5rem', animation:'fadeIn 0.25s ease-out'
+          }}>
+            <div style={{
+              background:'var(--bg-base)', borderRadius:'1.5rem',
+              padding:'2.5rem', maxWidth:520, width:'100%',
+              border:'1px solid var(--border-light)', boxShadow:'0 24px 80px rgba(0,0,0,0.4)'
+            }}>
+              {posted ? (
+                <div style={{ textAlign:'center', padding:'1rem 0' }}>
+                  <div style={{ fontSize:'3rem', marginBottom:'0.75rem' }}>🎉</div>
+                  <h3 style={{ fontSize:'1.4rem', fontWeight:800, color:'var(--text-primary)', marginBottom:'0.4rem' }}>Posted to Community!</h3>
+                  <p style={{ color:'var(--text-secondary)', fontSize:'0.95rem' }}>Your journey is now visible on the community feed.</p>
+                </div>
+              ) : (
+                <>
+                  <div style={{ textAlign:'center', marginBottom:'1.75rem' }}>
+                    <div style={{ fontSize:'2.5rem', marginBottom:'0.75rem' }}>🌐</div>
+                    <h3 style={{ fontSize:'1.35rem', fontWeight:800, color:'var(--text-primary)', marginBottom:'0.4rem' }}>Share Your Journey?</h3>
+                    <p style={{ color:'var(--text-secondary)', fontSize:'0.9rem', lineHeight:1.6 }}>Post this simulation to the community feed so others can learn from your decisions. Completely optional.</p>
+                  </div>
+
+                  <div style={{ marginBottom:'1.5rem' }}>
+                    <label style={{ display:'block', fontSize:'0.85rem', fontWeight:600, color:'var(--text-secondary)', marginBottom:'0.5rem' }}>Add a caption (optional)</label>
+                    <textarea
+                      value={shareCaption}
+                      onChange={e => setShareCaption(e.target.value)}
+                      placeholder="What did you learn? What would you do differently?"
+                      style={{ width:'100%', minHeight:90, padding:'0.85rem 1rem', borderRadius:'var(--radius-md)', border:'1px solid var(--border-light)', background:'var(--bg-surface)', color:'var(--text-primary)', fontFamily:'inherit', fontSize:'0.93rem', lineHeight:1.6, resize:'vertical', boxSizing:'border-box' }}
+                    />
+                  </div>
+
+                  <div style={{ display:'flex', gap:'0.85rem' }}>
+                    <button
+                      onClick={() => setShowShareModal(false)}
+                      className="btn-outline"
+                      style={{ flex:1, padding:'0.8rem', fontWeight:600 }}
+                    >
+                      Skip
+                    </button>
+                    <button
+                      onClick={handlePublishPost}
+                      disabled={isPosting}
+                      className="btn-solid"
+                      style={{ flex:2, padding:'0.8rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem' }}
+                    >
+                      {isPosting ? <div className="loader-white" style={{ width:18, height:18 }}/> : '🌐 Post to Community'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         <ReportCard
           resources={resources}
           decisionLog={decisionLog}
           mvpFeatures={mvpFeatures}
           fundingDetails={fundingDetails}
         />
-        <div style={{ marginTop: '3rem', maxWidth: 900, margin: '3rem auto 0 auto', width: '100%' }}>
-          <button onClick={() => { setProblem(''); setSimulationId(''); setRound(1); setPersonas([]); setEvaluation(null); setDecisionLog([]); setResources({cash:80,impact:20,trust:50}); setAppState('form'); }}
-            className="btn-solid btn-lg" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem' }}>
+        <div style={{ marginTop: '3rem', maxWidth: 900, margin: '3rem auto 0 auto', width: '100%', display:'flex', gap:'1rem' }}>
+          <button
+            onClick={() => { setShowShareModal(true); setPosted(false); setShareCaption(''); }}
+            className="btn-outline btn-lg"
+            style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', flex:1 }}
+          >
+            🌐 Share to Community
+          </button>
+          <button onClick={() => { setProblem(''); setSimulationId(''); setRound(1); setPersonas([]); setEvaluation(null); setDecisionLog([]); setResources({cash:80,impact:20,trust:50}); setShowShareModal(false); setPosted(false); setAppState('form'); }}
+            className="btn-solid btn-lg" style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', flex:1 }}>
             <RefreshCw size={16}/> {t('startNewSimulation')}
           </button>
         </div>

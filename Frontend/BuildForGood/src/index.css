@@ -1157,3 +1157,76 @@ select:focus-visible {
 *::-webkit-scrollbar-thumb:hover {
   background: var(--accent-primary);
 }
+
+/* ─────────── MOBILE RESPONSIVE OVERRIDES ─────────── */
+@media (max-width: 768px) {
+  /* Dashboard specific overrides */
+  .dashboard-layout > div[style*="overflow: hidden"] {
+    flex-direction: column-reverse !important;
+  }
+  
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    flex-direction: row !important;
+    padding: 0.5rem 0 !important;
+    border-right: none !important;
+    border-top: 1px solid var(--border-light) !important;
+    z-index: 100;
+  }
+  
+  .sidebar .nav-menu {
+    flex-direction: row !important;
+    justify-content: space-around !important;
+    gap: 0 !important;
+  }
+
+  /* Hide labels and extra sections on mobile bottom nav */
+  .sidebar .nav-link span { display: none !important; }
+  .sidebar .nav-link { 
+    padding: 0.5rem !important; 
+    justify-content: center !important; 
+    flex: 1;
+  }
+  
+  /* Hide recent projects wrapper on mobile */
+  .sidebar .nav-menu > div:not(.nav-link) { display: none !important; }
+  
+  /* Reset logout button margin */
+  .sidebar .nav-menu > .logout { margin-top: 0 !important; }
+
+  /* Adjust main content padding */
+  .main-content { padding: 1rem !important; }
+
+  /* Force generic inline grids into single column */
+  div[style*="grid-template-columns"], 
+  div[style*="gridTemplateColumns"] {
+    grid-template-columns: 1fr !important;
+  }
+  div[style*="grid-template-columns: repeat(3"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Progress Bar Container */
+  div[style*="alignItems: center"] > div > span:not(.hero-title) {
+    white-space: normal !important;
+    font-size: 0.75rem !important;
+  }
+  
+  /* Flow specific container heights */
+  .founder-flow-main, main {
+    padding-bottom: 2rem !important;
+  }
+
+  /* Mobile typography & margins */
+  h1 { font-size: 2rem !important; }
+  h2 { font-size: 1.5rem !important; line-height: 1.3 !important; }
+  
+  /* Feature cards inside inline grids need extra breath */
+  .features-grid .feature-card { padding: 1.5rem !important; }
+
+  /* Navbar adjustments */
+  .brand-logo-inline { font-size: 1.2rem !important; }
+  header { padding: 0.75rem 1rem !important; }
+  header div[onClick] { transform: scale(0.9); margin-left: 0.5rem; } /* avatar */
+}

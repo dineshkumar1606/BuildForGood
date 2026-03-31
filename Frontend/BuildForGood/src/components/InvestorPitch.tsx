@@ -59,11 +59,11 @@ const ROUNDS = [
       meera: [
         { text: 'We built an app that connects communities to resources using an AI matching algorithm.', isCorrect: false },
         { text: `We saw that [Problem] ruins lives daily. We are stopping it at the source.`, isCorrect: true },
-        { text: 'We are raising $500k to monopolize the social space.', isCorrect: false }
+        { text: 'We are raising ₹5 Crores to monopolize the social space.', isCorrect: false }
       ],
       rajan: [
         { text: 'We have a really cool platform with 15 unique features to solve this problem.', isCorrect: false },
-        { text: `The market for [Problem] loses $10B annually to inefficiency. We built the fix.`, isCorrect: true },
+        { text: `The market for [Problem] loses ₹10,000 Crores annually to inefficiency. We built the fix.`, isCorrect: true },
         { text: 'We want to make the world a better place through technology.', isCorrect: false }
       ],
       sunita: [
@@ -85,7 +85,7 @@ const ROUNDS = [
       ],
       rajan: [
         { text: 'Our projections show capturing 50% of the market in year 1.', isCorrect: false },
-        { text: 'We don\'t have LTV data yet because it\'s too early, but our initial CAC is $5, which beats the industry average.', isCorrect: true },
+        { text: 'We don\'t have LTV data yet because it\'s too early, but our initial CAC is ₹400, which beats the industry average.', isCorrect: true },
         { text: 'We are focusing on product right now, not numbers.', isCorrect: false }
       ],
       sunita: [
@@ -102,13 +102,13 @@ const ROUNDS = [
     options: {
       meera: [
         { text: 'What do you think is fair?', isCorrect: false },
-        { text: 'We are raising $250k on a $2M post-money cap, based on the capital needed to reach our next 1,000 community members.', isCorrect: true },
-        { text: 'We want a $10M valuation because that\'s what standard tech startups get.', isCorrect: false }
+        { text: 'We are raising ₹2.5 Crores on a ₹20 Crores post-money cap, based on the capital needed to reach our next 1,000 community members.', isCorrect: true },
+        { text: 'We want a ₹100 Crores valuation because that\'s what standard tech startups get.', isCorrect: false }
       ],
       rajan: [
         { text: 'We are waiting for a lead investor to price it.', isCorrect: false },
-        { text: 'Raising $500k on a $4M cap. It gives us 18 months of runway to hit $50k MRR, which justifies a Series A.', isCorrect: true },
-        { text: 'We are raising $1M on a $20M cap.', isCorrect: false }
+        { text: 'Raising ₹5 Crores on a ₹40 Crores cap. It gives us 18 months of runway to hit ₹50 Lakh MRR, which justifies a Series A.', isCorrect: true },
+        { text: 'We are raising ₹10 Crores on a ₹200 Crores cap.', isCorrect: false }
       ],
       sunita: [
         { text: 'We just need whatever grant amount you can spare.', isCorrect: false },
@@ -245,8 +245,8 @@ export default function InvestorPitch({ onComplete, problemStatement }: Investor
       offerContent = {
         title: 'Strong Offer',
         msg: `"${investor.name} is extremely impressed. You hit every psychological trigger perfectly."`,
-        offerText: '$500,000 for 15% equity',
-        amount: '$500,000',
+        offerText: '₹5 Crores for 15% equity',
+        amount: '₹5 Crores',
         equity: '15%',
         success: true
       };
@@ -254,8 +254,8 @@ export default function InvestorPitch({ onComplete, problemStatement }: Investor
       offerContent = {
         title: 'Lowball Offer',
         msg: `"${investor.name} sees potential but thinks you still have some blind spots. They are hedging their risk."`,
-        offerText: '$300,000 for 25% equity',
-        amount: '$300,000',
+        offerText: '₹3 Crores for 25% equity',
+        amount: '₹3 Crores',
         equity: '25%',
         success: true
       };
@@ -365,13 +365,13 @@ export default function InvestorPitch({ onComplete, problemStatement }: Investor
           {activeTab === 'deck' && (
             <div>
               <strong style={{ color: 'var(--text-primary)' }}>Your Pre-set Numbers:</strong><br />
-              Don't make up numbers on the fly. You need $500k to reach the next milestone (100k users / $50k MRR).
+              Don't make up numbers on the fly. You need ₹5 Crores to reach the next milestone (100k users / ₹50 Lakh MRR).
             </div>
           )}
           {activeTab === 'terms' && (
             <div>
               <strong style={{ color: 'var(--text-primary)' }}>Your Walk-Away Point:</strong><br />
-              Do NOT accept less than $200k, and do NOT give up more than 20% equity. Do NOT pivot off your core problem statement.
+              Do NOT accept less than ₹2 Crores, and do NOT give up more than 20% equity. Do NOT pivot off your core problem statement.
             </div>
           )}
         </div>

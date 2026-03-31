@@ -126,7 +126,7 @@ export default function MVPBuilder({ availableBudget, domain, onComplete }: MVPB
   const remainingBudget = availableBudget - totalCost;
 
   // Warning Constraints
-  const TECH_BUDGET_LIMIT = 45000;
+  const TECH_BUDGET_LIMIT = availableBudget;
   const TIME_LIMIT = 45;
 
   const isBudgetWarning = totalCost > TECH_BUDGET_LIMIT;
